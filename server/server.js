@@ -1,130 +1,63 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const path = require('path');
+
+dotenv.config();
 
 const app = express();
 
-// ============================================================================
-// MIDDLEWARE SETUP
-// ============================================================================
-
-// Security middleware
-app.use(helmet());
-app.use(mongoSanitize());
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-});
-app.use('/api/', limiter);
-
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// CORS
+// Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  credentials: true
 }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Compression
-app.use(compression());
-
-// Logging
-app.use(morgan('dev'));
-
-// ============================================================================
-// DATABASE CONNECTION
-// ============================================================================
-
+// Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-})
-.then(() => console.log('✅ MongoDB connected'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
+}).then(() => {
+  console.log('✅ MongoDB connected successfully');
+}).catch((err) => {
+  console.error('❌ MongoDB connection error:', err);
+  process.exit(1);
+});
 
-// ============================================================================
-// ROUTES
-// ============================================================================
-
+// Routes
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/books', require('./routes/bookRoutes'));
 app.use('/api/chapters', require('./routes/chapterRoutes'));
-app.use('/api/writers', require('./routes/writerRoutes'));
 app.use('/api/comments', require('./routes/commentRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/search', require('./routes/searchRoutes'));
-app.use('/api/upload', require('./routes/uploadRoutes'));
 
-// ============================================================================
-// HEALTH CHECK
-// ============================================================================
-
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'Server is running ✅' });
 });
 
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
-
-app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Route not found' 
-  });
-});
-
+// Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err);
-  
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal server error';
-  
-  res.status(statusCode).json({
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
     success: false,
-    message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    message: err.message || 'Internal server error'
   });
 });
 
-// ============================================================================
-// SERVER STARTUP
-// ============================================================================
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Route not found' });
+});
 
 const PORT = process.env.PORT || 5000;
-
-const server = app.listen(PORT, () => {
-  console.log(`\n🚀 WriterWorld API Server running on http://localhost:${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🗄️  Database: ${process.env.MONGODB_URI ? 'Connected' : 'Not configured'}`);
-  console.log(`🤖 OpenAI: ${process.env.OPENAI_API_KEY ? 'Configured' : 'Not configured'}`);
-  console.log('\n');
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    mongoose.connection.close(false, () => {
-      console.log('MongoDB connection closed');
-      process.exit(0);
-    });
-  });
+app.listen(PORT, () => {
+  console.log(`🚀 WriterWorld Server running on port ${PORT}`);
 });
 
 module.exports = app;
