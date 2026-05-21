@@ -1,0 +1,22 @@
+{
+  "name": "writerworld",
+  "version": "1.0.0",
+  "description": "AI-powered book publishing platform",
+  "private": true,
+  "scripts": {
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm start\"",
+    "build": "npm run build-server && npm run build-client",
+    "build-server": "cd server && npm run build",
+    "build-client": "cd client && npm run build",
+    "start": "node server/server.js",
+    "test": "concurrently \"cd server && npm test\" \"cd client && npm test\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

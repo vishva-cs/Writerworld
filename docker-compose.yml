@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: writerworld_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: writerworld
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - writerworld_network
+
+  redis:
+    image: redis:alpine
+    container_name: writerworld_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - writerworld_network
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: writerworld_backend
+    ports:
+      - "5000:5000"
+    environment:
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/writerworld
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+      JWT_SECRET: your_jwt_secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./server:/app
+    networks:
+      - writerworld_network
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: writerworld_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - writerworld_network
+
+volumes:
+  mongodb_data:
+
+networks:
+  writerworld_network:
+    driver: bridge
